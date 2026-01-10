@@ -18,7 +18,7 @@
 
 #include <pspsdk.h>
 #include <pspkernel.h>
-#include <pspctrl.h>
+#include <pspdisplay.h>
 
 #include <stdio.h>
 #include <string.h>
@@ -30,85 +30,8 @@ PSP_MODULE_INFO("ResistanceRemastered", 0x1007, 1, 0);
 #define FAKE_DEVNAME      "usbpspcm0:"
 #define FAKE_UID          0x12345678
 
-#define PS3_CTRL_LEFT     0x8000
-#define PS3_CTRL_DOWN     0x4000
-#define PS3_CTRL_RIGHT    0x2000
-#define PS3_CTRL_UP       0x1000
-#define PS3_CTRL_START    0x0800
-#define PS3_CTRL_R3       0x0400
-#define PS3_CTRL_L3       0x0200
-#define PS3_CTRL_SELECT   0x0100
-#define PS3_CTRL_SQUARE   0x0080
-#define PS3_CTRL_CROSS    0x0040
-#define PS3_CTRL_CIRCLE   0x0020
-#define PS3_CTRL_TRIANGLE 0x0010
-#define PS3_CTRL_R1       0x0008
-#define PS3_CTRL_L1       0x0004
-#define PS3_CTRL_R2       0x0002
-#define PS3_CTRL_L2       0x0001
-
 static STMOD_HANDLER previous;
-static SceCtrlData pad;
 static int init_mode = 0;
-
-static u16 convertButtons(u32 psp_buttons) {
-  u16 ps3_buttons = 0;
-
-  if (psp_buttons & PSP_CTRL_LEFT)
-    ps3_buttons |= PS3_CTRL_LEFT | PS3_CTRL_L2; // Remap weapon select
-
-  if (psp_buttons & PSP_CTRL_DOWN)
-    ps3_buttons |= PS3_CTRL_DOWN | PS3_CTRL_R3; // Remap aim
-
-  if (psp_buttons & PSP_CTRL_RIGHT)
-    ps3_buttons |= PS3_CTRL_RIGHT | PS3_CTRL_R2; // Remap weapon select
-
-  if (psp_buttons & PSP_CTRL_UP)
-    ps3_buttons |= PS3_CTRL_UP;
-
-  if (psp_buttons & PSP_CTRL_START)
-    ps3_buttons |= PS3_CTRL_START;
-
-  if (psp_buttons & PSP_CTRL_SELECT)
-    ps3_buttons |= PS3_CTRL_SELECT;
-
-  if (psp_buttons & PSP_CTRL_SQUARE)
-    ps3_buttons |= PS3_CTRL_SQUARE;
-
-  if (psp_buttons & PSP_CTRL_CROSS)
-    ps3_buttons |= PS3_CTRL_CROSS;
-
-  if (psp_buttons & PSP_CTRL_CIRCLE)
-    ps3_buttons |= PS3_CTRL_CIRCLE;
-
-  if (psp_buttons & PSP_CTRL_TRIANGLE)
-    ps3_buttons |= PS3_CTRL_TRIANGLE;
-
-  if (psp_buttons & PSP_CTRL_RTRIGGER)
-    ps3_buttons |= PS3_CTRL_R1;
-
-  if (psp_buttons & PSP_CTRL_LTRIGGER)
-    ps3_buttons |= PS3_CTRL_L1;
-
-  return ps3_buttons;
-}
-
-static int sceCtrlReadBufferPositivePatched(SceCtrlData *pad_data, int count) {
-  int res = sceCtrlReadBufferPositive(pad_data, count);
-  int k1 = pspSdkSetK1(0);
-
-  if (init_mode == 2) {
-    memcpy(&pad, pad_data, sizeof(SceCtrlData));
-    pad_data->Buttons = 0;
-    pad_data->Lx = 128;
-    pad_data->Ly = 128;
-    pad_data->Rsrv[0] = 128;
-    pad_data->Rsrv[1] = 128;
-  }
-
-  pspSdkSetK1(k1);
-  return res;
-}
 
 static int sceIoReadPatched(SceUID fd, void *data, SceSize size) {
   int k1 = pspSdkSetK1(0);
@@ -121,22 +44,15 @@ static int sceIoReadPatched(SceUID fd, void *data, SceSize size) {
     int len = 0;
 
     if (init_mode == 0) {
-      // Activate Resistance Plus
-      sprintf(data, "%1d%1d", 1, 1);
+      // Don't Activate Resistance Plus
+      sprintf(data, "%1d%1d", 1, 0);
       len = 3;
       init_mode++;
     } else if (init_mode == 1) {
-      // Activate infected mode if desired
-      SceIoStat stat;
-      memset(&stat, 0, sizeof(SceIoStat));
-      int infected_mode = sceIoGetstat("ms0:/seplugins/resistance_infected.bin", &stat) >= 0;
-      sprintf(data, "%1d%1d", 2, infected_mode);
+      // Activate infected mode
+      sprintf(data, "%1d%1d", 2, 1);
       len = 3;
       init_mode++;
-    } else {
-      // Fake PS3 controls
-      sprintf(data, "%1d%04x%02x%02x%02x%02x", 0, convertButtons(pad.Buttons), pad.Rsrv[0], pad.Rsrv[1], pad.Lx, pad.Ly);
-      len = 14;
     }
 
     pspSdkSetK1(k1);
@@ -227,21 +143,18 @@ static int sceUsbDeactivatePatched(u32 pid) {
 
 int OnModuleStart(SceModule2 *mod) {
   if (strcmp(mod->modname, "Resistance") == 0) {
-    // Redirect ctrl function to dummy pad input
-    sctrlHENPatchSyscall(FindProc("sceController_Service", "sceCtrl", 0x1F803938), sceCtrlReadBufferPositivePatched);
 
     // Redirect IO functions to fake usbpspcm0: communication
-    sctrlHENPatchSyscall(FindProc("sceIOFileManager", "IoFileMgrForUser", 0x109F50BC), sceIoOpenPatched);
-    sctrlHENPatchSyscall(FindProc("sceIOFileManager", "IoFileMgrForUser", 0x6A638D83), sceIoReadPatched);
-    sctrlHENPatchSyscall(FindProc("sceIOFileManager", "IoFileMgrForUser", 0x42EC03AC), sceIoWritePatched);
-    sctrlHENPatchSyscall(FindProc("sceIOFileManager", "IoFileMgrForUser", 0x810C4BC3), sceIoClosePatched);
-    sctrlHENPatchSyscall(FindProc("sceIOFileManager", "IoFileMgrForUser", 0x54F5FB11), sceIoDevctlPatched);
-
+    sctrlHENPatchSyscall((void*)sctrlHENFindFunction("sceIOFileManager", "IoFileMgrForUser", 0x109F50BC), sceIoOpenPatched);
+    sctrlHENPatchSyscall((void*)sctrlHENFindFunction("sceIOFileManager", "IoFileMgrForUser", 0x6A638D83), sceIoReadPatched);
+    sctrlHENPatchSyscall((void*)sctrlHENFindFunction("sceIOFileManager", "IoFileMgrForUser", 0x42EC03AC), sceIoWritePatched);
+    sctrlHENPatchSyscall((void*)sctrlHENFindFunction("sceIOFileManager", "IoFileMgrForUser", 0x810C4BC3), sceIoClosePatched);
+    sctrlHENPatchSyscall((void*)sctrlHENFindFunction("sceIOFileManager", "IoFileMgrForUser", 0x54F5FB11), sceIoDevctlPatched);
     // Redirect USB functions to fake success
-    sctrlHENPatchSyscall(FindProc("sceUSB_Driver", "sceUsb", 0xAE5DE6AF), sceUsbStartPatched);
-    sctrlHENPatchSyscall(FindProc("sceUSB_Driver", "sceUsb", 0xC2464FA0), sceUsbStopPatched);
-    sctrlHENPatchSyscall(FindProc("sceUSB_Driver", "sceUsb", 0x586DB82C), sceUsbActivatePatched);
-    sctrlHENPatchSyscall(FindProc("sceUSB_Driver", "sceUsb", 0xC572A9C8), sceUsbDeactivatePatched);
+    sctrlHENPatchSyscall((void*)sctrlHENFindFunction("sceUSB_Driver", "sceUsb", 0xAE5DE6AF), sceUsbStartPatched);
+    sctrlHENPatchSyscall((void*)sctrlHENFindFunction("sceUSB_Driver", "sceUsb", 0xC2464FA0), sceUsbStopPatched);
+    sctrlHENPatchSyscall((void*)sctrlHENFindFunction("sceUSB_Driver", "sceUsb", 0x586DB82C), sceUsbActivatePatched);
+    sctrlHENPatchSyscall((void*)sctrlHENFindFunction("sceUSB_Driver", "sceUsb", 0xC572A9C8), sceUsbDeactivatePatched);
 
     // Clear caches
     sceKernelDcacheWritebackAll();
