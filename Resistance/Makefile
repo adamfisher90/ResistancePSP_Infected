@@ -4,7 +4,7 @@ OBJS = main.o exports.o
 CFLAGS = -Os -G0 -Wall -fshort-wchar -fno-pic -mno-check-zero-division -std=c99
 CXXFLAGS = $(CFLAGS) -fno-exceptions -fno-rtti
 ASFLAGS = $(CFLAGS)
-LDFLAGS = -mno-crt0 -nostartfiles
+LDFLAGS = -nostartfiles
 PSP_FW_VERSION=660
 
 BUILD_PRX = 1

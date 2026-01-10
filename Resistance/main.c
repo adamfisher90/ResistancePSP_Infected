@@ -33,7 +33,7 @@ PSP_MODULE_INFO("ResistanceRemastered", 0x1007, 1, 0);
 static STMOD_HANDLER previous;
 static int init_mode = 0;
 
-static int sceIoReadPatched(SceUID fd, void *data, SceSize size) {
+int sceIoReadPatched(SceUID fd, void *data, SceSize size) {
   int k1 = pspSdkSetK1(0);
 
   // Check if it's the fake UID
@@ -63,7 +63,7 @@ static int sceIoReadPatched(SceUID fd, void *data, SceSize size) {
   return sceIoRead(fd, data, size);
 }
 
-static SceUID sceIoOpenPatched(const char *file, int flags, SceMode mode) {
+SceUID sceIoOpenPatched(const char *file, int flags, SceMode mode) {
   int k1 = pspSdkSetK1(0);
 
   // Fake UID
@@ -76,7 +76,7 @@ static SceUID sceIoOpenPatched(const char *file, int flags, SceMode mode) {
   return sceIoOpen(file, flags, mode);
 }
 
-static int sceIoWritePatched(SceUID fd, const void *data, SceSize size) {
+int sceIoWritePatched(SceUID fd, const void *data, SceSize size) {
   int k1 = pspSdkSetK1(0);
 
   // Fake success
@@ -89,7 +89,7 @@ static int sceIoWritePatched(SceUID fd, const void *data, SceSize size) {
   return sceIoWrite(fd, data, size);
 }
 
-static int sceIoClosePatched(SceUID fd) {
+int sceIoClosePatched(SceUID fd) {
   int k1 = pspSdkSetK1(0);
 
   // Fake success
@@ -102,7 +102,7 @@ static int sceIoClosePatched(SceUID fd) {
   return sceIoClose(fd);
 }
 
-static int sceIoDevctlPatched(const char *dev, unsigned int cmd, void *indata, int inlen, void *outdata, int outlen) {
+int sceIoDevctlPatched(const char *dev, unsigned int cmd, void *indata, int inlen, void *outdata, int outlen) {
   int k1 = pspSdkSetK1(0);
 
   if (cmd == 0x03415001) { // Fake connection for register
@@ -125,36 +125,37 @@ static int sceIoDevctlPatched(const char *dev, unsigned int cmd, void *indata, i
   return sceIoDevctl(dev, cmd, indata, inlen, outdata, outlen);
 }
 
-static int sceUsbStartPatched(const char *driverName, int size, void *args) {
+int sceUsbStartPatched(const char *driverName, int size, void *args) {
   return 0;
 }
 
-static int sceUsbStopPatched(const char *driverName, int size, void *args) {
+int sceUsbStopPatched(const char *driverName, int size, void *args) {
   return 0;
 }
 
-static int sceUsbActivatePatched(u32 pid) {
+int sceUsbActivatePatched(u32 pid) {
   return 0;
 }
 
-static int sceUsbDeactivatePatched(u32 pid) {
+int sceUsbDeactivatePatched(u32 pid) {
   return 0;
 }
 
-int OnModuleStart(SceModule2 *mod) {
+int OnModuleStart(SceModule *mod) {
   if (strcmp(mod->modname, "Resistance") == 0) {
 
     // Redirect IO functions to fake usbpspcm0: communication
-    sctrlHENPatchSyscall((void*)sctrlHENFindFunction("sceIOFileManager", "IoFileMgrForUser", 0x109F50BC), sceIoOpenPatched);
-    sctrlHENPatchSyscall((void*)sctrlHENFindFunction("sceIOFileManager", "IoFileMgrForUser", 0x6A638D83), sceIoReadPatched);
-    sctrlHENPatchSyscall((void*)sctrlHENFindFunction("sceIOFileManager", "IoFileMgrForUser", 0x42EC03AC), sceIoWritePatched);
-    sctrlHENPatchSyscall((void*)sctrlHENFindFunction("sceIOFileManager", "IoFileMgrForUser", 0x810C4BC3), sceIoClosePatched);
-    sctrlHENPatchSyscall((void*)sctrlHENFindFunction("sceIOFileManager", "IoFileMgrForUser", 0x54F5FB11), sceIoDevctlPatched);
+    sctrlHookImportByNID(mod, "IoFileMgrForUser", 0x109F50BC, sceIoOpenPatched);
+    sctrlHookImportByNID(mod, "IoFileMgrForUser", 0x6A638D83, sceIoReadPatched);
+    sctrlHookImportByNID(mod, "IoFileMgrForUser", 0x42EC03AC, sceIoWritePatched);
+    sctrlHookImportByNID(mod, "IoFileMgrForUser", 0x810C4BC3, sceIoClosePatched);
+    sctrlHookImportByNID(mod, "IoFileMgrForUser", 0x54F5FB11, sceIoDevctlPatched);
+
     // Redirect USB functions to fake success
-    sctrlHENPatchSyscall((void*)sctrlHENFindFunction("sceUSB_Driver", "sceUsb", 0xAE5DE6AF), sceUsbStartPatched);
-    sctrlHENPatchSyscall((void*)sctrlHENFindFunction("sceUSB_Driver", "sceUsb", 0xC2464FA0), sceUsbStopPatched);
-    sctrlHENPatchSyscall((void*)sctrlHENFindFunction("sceUSB_Driver", "sceUsb", 0x586DB82C), sceUsbActivatePatched);
-    sctrlHENPatchSyscall((void*)sctrlHENFindFunction("sceUSB_Driver", "sceUsb", 0xC572A9C8), sceUsbDeactivatePatched);
+    sctrlHookImportByNID(mod, "sceUsb", 0xAE5DE6AF, sceUsbStartPatched);
+    sctrlHookImportByNID(mod, "sceUsb", 0xC2464FA0, sceUsbStopPatched);
+    sctrlHookImportByNID(mod, "sceUsb", 0x586DB82C, sceUsbActivatePatched);
+    sctrlHookImportByNID(mod, "sceUsb", 0xC572A9C8, sceUsbDeactivatePatched);
 
     // Clear caches
     sceKernelDcacheWritebackAll();
