@@ -25,7 +25,7 @@
 
 #include <systemctrl.h>
 
-PSP_MODULE_INFO("ResistanceRemastered", 0x1007, 1, 0);
+PSP_MODULE_INFO("ResistanceInfected", 0x1007, 1, 0);
 
 #define FAKE_DEVNAME      "usbpspcm0:"
 #define FAKE_UID          0x12345678

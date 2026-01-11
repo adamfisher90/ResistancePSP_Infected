@@ -1,4 +1,4 @@
-TARGET = resistance_remastered
+TARGET = resistance_infected
 OBJS = main.o exports.o
 
 INCDIR = -I $(ARKROOT)/common/include
