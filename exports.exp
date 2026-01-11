@@ -5,4 +5,18 @@ PSP_EXPORT_FUNC(module_start)
 PSP_EXPORT_VAR(module_info)
 PSP_EXPORT_END
 
+PSP_EXPORT_START(ResistancePrivate, 0, 0x4001)
+PSP_EXPORT_START(sceCtrlReadBufferPositivePatched)
+PSP_EXPORT_FUNC(sceIoReadPatched)
+PSP_EXPORT_FUNC(sceIoOpenPatched)
+PSP_EXPORT_FUNC(sceIoWritePatched)
+PSP_EXPORT_FUNC(sceIoClosePatched)
+PSP_EXPORT_FUNC(sceIoDevctlPatched)
+PSP_EXPORT_FUNC(sceUsbStartPatched)
+PSP_EXPORT_FUNC(sceUsbStopPatched)
+PSP_EXPORT_FUNC(sceUsbActivatePatched)
+PSP_EXPORT_FUNC(sceUsbDeactivatePatched)
+PSP_EXPORT_END
+
+
 PSP_END_EXPORTS
