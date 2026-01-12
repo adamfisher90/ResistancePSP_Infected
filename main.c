@@ -229,7 +229,7 @@ int sceUsbDeactivatePatched(u32 pid) {
 int OnModuleStart(SceModule *mod) {
   if (strcmp(mod->modname, "Resistance") == 0) {
     // Redirect ctrl function to dummy pad input
-    sctrlHookImportByNID(mod, "sceCtrl", 0x109F50BC, sceCtrlReadBufferPositivePatched);
+    sctrlHookImportByNID(mod, "sceCtrl", 0x1F803938, sceCtrlReadBufferPositivePatched);
 
     // Redirect IO functions to fake usbpspcm0: communication
     sctrlHookImportByNID(mod, "IoFileMgrForUser", 0x109F50BC, sceIoOpenPatched);
